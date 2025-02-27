@@ -156,8 +156,10 @@ class TwoStreamSalientModel(nn.Module):
         self.eog_branch = self.build_branch()
 
         # Merge layers
-        self.merge_multiply = nn.Multiply()
-        self.merge_add = nn.Add()
+        # 修改这里的合并层定义
+        # self.merge_multiply = nn.Multiply()  # 删除这行
+        # self.merge_add = nn.Add()  # 删除这行
+        
         self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))
         self.se_dense1 = nn.Linear(self.filters[0], self.filters[0] // 4)
         self.se_dense2 = nn.Linear(self.filters[0] // 4, self.filters[0])
@@ -212,8 +214,8 @@ class TwoStreamSalientModel(nn.Module):
         eog_output = self.eog_branch(eog_input)
 
         # Merge branches
-        multiply = self.merge_multiply(eeg_output, eog_output)
-        merge = self.merge_add(eeg_output, eog_output, multiply)
+        multiply = eeg_output * eog_output  # 直接使用 * 运算符
+        merge = eeg_output + eog_output + multiply  # 直接使用 + 运算符
 
         # Squeeze-and-Excitation (SE) block
         se = self.global_avg_pool(merge)
