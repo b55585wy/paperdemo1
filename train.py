@@ -8,6 +8,8 @@ import itertools
 import numpy as np
 import torch
 import torch.nn as nn
+import yaml
+
 from torch.utils.data import DataLoader, TensorDataset
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -37,7 +39,7 @@ def get_parser() -> argparse.Namespace:
     parser.add_argument("--gpus", '-g', default='1', help="Number of GPUs for training.")
     parser.add_argument("--modal", '-m', default='1', choices=['0', '1'],
                         help="Training modality: 0 for single modality, 1 for multi-modality.")
-    parser.add_argument("--data_dir", '-d', default="./data/sleepedf-2013/npzs", help="Directory containing data.")
+    parser.add_argument("--data_dir", '-d', default="../autodl-fs/prepared-cassette", help="Directory containing data.")
     parser.add_argument("--output_dir", '-o', default='./result', help="Directory to save results.")
     parser.add_argument("--valid", '-v', default='20', help="Number of folds for k-fold validation.")
     parser.add_argument("--from_fold", default='0', help="Starting fold for training.")
@@ -102,7 +104,7 @@ def train(args: argparse.Namespace, hyper_param_dict: dict) -> dict:
     for id in range(ids):
         inner_list = []
         for name in npz_names:
-            pattern = re.compile(f".*SC4{id:02}[12][EFG]0\.npz")
+            pattern = re.compile(rf".*SC4{id:02}[12][EFG]0\.npz")
             if re.match(pattern, name):
                 inner_list.append(name)
         if inner_list:  # not empty
