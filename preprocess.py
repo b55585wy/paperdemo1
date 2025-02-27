@@ -45,15 +45,17 @@ def preprocess(data: List[torch.Tensor],
             beg += param['big_group_size']
         return torch.cat(chunks, dim=1) if chunks else torch.tensor([])
 
-    def label_big_group(l: torch.Tensor) -> torch.Tensor:
-        """将标签分成大组"""
-        chunks = []
-        beg = 0
-        while (beg + param['big_group_size']) <= len(l):
-            y = l[beg:beg + param['big_group_size']]
-            chunks.append(y.unsqueeze(0))
-            beg += param['big_group_size']
-        return torch.cat(chunks, dim=0) if chunks else torch.tensor([])
+    def label_big_group(l: np.ndarray) -> torch.Tensor:
+    """将标签分成大组"""
+    chunks = []
+    beg = 0
+    while (beg + param['big_group_size']) <= len(l):
+        y = l[beg:beg + param['big_group_size']]
+        # 将NumPy数组转换为PyTorch张量后再使用unsqueeze
+        y = torch.from_numpy(y).unsqueeze(0)
+        chunks.append(y)
+        beg += param['big_group_size']
+    return torch.cat(chunks, dim=0) if chunks else torch.tensor([])
 
     def data_window_slice(d: torch.Tensor) -> torch.Tensor:
         """数据增强的滑动窗口处理"""
