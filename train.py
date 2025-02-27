@@ -99,21 +99,27 @@ def train(args: argparse.Namespace, hyper_param_dict: dict) -> dict:
         exit(-1)
     npz_names.sort()
 
+    # Replace the problematic section
     npzs_list = []
     ids = 20 if len(npz_names) < 100 else 83  # 20 for sleepedf-39, 83 for sleepedf-153
     for id in range(ids):
         inner_list = []
         for name in npz_names:
-            pattern = re.compile(rf".*SC4{id:02}[12][EFG]0\.npz")
+            pattern = re.compile(f".*SC4{id:02}[12][EFG]0\.npz")
             if re.match(pattern, name):
                 inner_list.append(name)
         if inner_list:  # not empty
             npzs_list.append(inner_list)
-    npzs_list = np.array(npzs_list)
-    npzs_list = np.array_split(npzs_list, k_folds)
 
-    # Save the split for summary
-    save_dict = {'split': npzs_list}
+    # Use list splitting instead of numpy array splitting
+    def split_list(lst, n):
+        k, m = divmod(len(lst), n)
+        return [lst[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n)]
+
+    npzs_list = split_list(npzs_list, k_folds)
+
+    # Save as object array to handle variable-length lists
+    save_dict = {'split': np.array(npzs_list, dtype=object)}
     np.savez(os.path.join(res_path, 'split.npz'), **save_dict)
 
     sleep_epoch_len = hyper_param_dict['sleep_epoch_len']
