@@ -46,16 +46,16 @@ def preprocess(data: List[torch.Tensor],
         return torch.cat(chunks, dim=1) if chunks else torch.tensor([])
 
     def label_big_group(l: np.ndarray) -> torch.Tensor:
-    """将标签分成大组"""
-    chunks = []
-    beg = 0
-    while (beg + param['big_group_size']) <= len(l):
-        y = l[beg:beg + param['big_group_size']]
-        # 将NumPy数组转换为PyTorch张量后再使用unsqueeze
-        y = torch.from_numpy(y).unsqueeze(0)
-        chunks.append(y)
-        beg += param['big_group_size']
-    return torch.cat(chunks, dim=0) if chunks else torch.tensor([])
+        """将标签分成大组"""
+        chunks = []
+        beg = 0
+        while (beg + param['big_group_size']) <= len(l):
+            y = l[beg:beg + param['big_group_size']]
+            # 将NumPy数组转换为PyTorch张量，并指定数据类型为long
+            y = torch.from_numpy(y).long().unsqueeze(0)
+            chunks.append(y)
+            beg += param['big_group_size']
+        return torch.cat(chunks, dim=0) if chunks else torch.tensor([], dtype=torch.long)
 
     def data_window_slice(d: torch.Tensor) -> torch.Tensor:
         """数据增强的滑动窗口处理"""
@@ -113,7 +113,8 @@ def preprocess(data: List[torch.Tensor],
     final_data = torch.cat([d for d in enhanced_data if d.numel()], dim=1)
     final_labels = torch.cat([l for l in enhanced_labels if l.numel()], dim=0)
 
-    return final_data, final_labels.unsqueeze(2).unsqueeze(3)
+    # 确保标签是long类型
+    return final_data, final_labels.long().unsqueeze(2).unsqueeze(3)
 
 if __name__ == "__main__":
     import glob
