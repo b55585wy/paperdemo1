@@ -153,7 +153,8 @@ def train(args: argparse.Namespace, hyper_param_dict: dict) -> dict:
         logging.info(f"Starting validation: {fold + 1}/{k_folds}")
         print(f"{k_folds}-fold validation, turn: {fold + 1}")
 
-        valid_npzs = list(itertools.chain.from_iterable(npzs_list[fold].tolist()))
+        # Fix this line - remove .tolist() since npzs_list[fold] is already a list
+        valid_npzs = list(itertools.chain.from_iterable(npzs_list[fold]))
         train_npzs = list(set(npz_names) - set(valid_npzs))
 
         logging.info("Loading data...")
