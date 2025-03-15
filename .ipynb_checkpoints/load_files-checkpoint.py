@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def load_npz_file(npz_file: str) -> tuple[np.ndarray, np.ndarray, int]:
+def load_npz_file(npz_file: str) -> (np.ndarray, np.ndarray, int):
     """
     Load data from npz files.
 
@@ -16,9 +16,7 @@ def load_npz_file(npz_file: str) -> tuple[np.ndarray, np.ndarray, int]:
     return data, labels, sampling_rate
 
 
-
-
-def load_npz_files(npz_files: list[str]) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+def load_npz_files(npz_files: list) -> (list, list):
     """
     Load data and labels for training and validation
 
@@ -38,17 +36,21 @@ def load_npz_files(npz_files: list[str]) -> tuple[list[torch.Tensor], list[torch
         elif fs != sampling_rate:
             raise Exception("Found mismatch in sampling rate.")
 
-        # Convert np.ndarray to torch.Tensor
-        tmp_data = torch.tensor(tmp_data, dtype=torch.float32)
-        tmp_labels = torch.tensor(tmp_labels, dtype=torch.int32)
+        # We add one extra axis for adaptation the Conv2d layer
+        # Here N denote filter number, C denote the channel number,
+        # W denote the width(Sleep Epoch Length), H denote the height
+        tmp_data = np.squeeze(tmp_data)  # the shape is [None, W, C]
+        tmp_data = tmp_data[:, :, :, np.newaxis, np.newaxis]  # expaned the N and H axis, [None, W, C, H, N]
+        tmp_data = np.concatenate((tmp_data[np.newaxis, :, :, 0, :, :], tmp_data[np.newaxis, :, :, 1, :, :],
+                                   tmp_data[np.newaxis, :, :, 2, :, :]), axis=0)  # transmute the shape to [C, None, W, H, N]
 
-        # Add one extra axis for adaptation to Conv2d layer
-        tmp_data = tmp_data[:, :, :, np.newaxis, np.newaxis]  # expanded the N and H axis, [None, W, C, H, N]
-        tmp_data = torch.cat((tmp_data[:, :, :, 0, :], tmp_data[:, :, :, 1, :], tmp_data[:, :, :, 2, :]), dim=0)  # transmute the shape to [C, None, W, H, N]
+
+        tmp_data = tmp_data.astype(np.float32)
+        tmp_labels = tmp_labels.astype(np.int32)
 
         data_list.append(tmp_data)
         labels_list.append(tmp_labels)
 
-    print(f"Loaded {len(data_list)} files totally.")
+    print(f"load {len(data_list)} files totally.")
 
     return data_list, labels_list

@@ -6,19 +6,19 @@ import logging
 import argparse
 import itertools
 import numpy as np
-import torch
-import torch.nn as nn
+# import torch
+# import torch.nn as nn
 import yaml
 
-from torch.utils.data import DataLoader, TensorDataset
-from torch.optim import Adam
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+# from torch.utils.data import DataLoader, TensorDataset
+# from torch.optim import Adam
+# from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from preprocess import preprocess
 from load_files import load_npz_files
-from evaluation import draw_training_plot
-from models import SingleSalientModel, TwoStreamSalientModel
-from loss_function import WeightedCrossEntropyLoss
+# from evaluation import draw_training_plot
+# from models import SingleSalientModel, TwoStreamSalientModel
+# from loss_function import WeightedCrossEntropyLoss
 
 
 def gpu_settings():
@@ -100,12 +100,13 @@ def train(args: argparse.Namespace, hyper_param_dict: dict) -> dict:
     npz_names.sort()
 
     # Replace the problematic section
+    # create the loading files list for each subject: [id1:[name1,name2],id2:[name3,name4],id3:[name5]]
     npzs_list = []
     ids = 20 if len(npz_names) < 100 else 83  # 20 for sleepedf-39, 83 for sleepedf-153
     for id in range(ids):
         inner_list = []
         for name in npz_names:
-            pattern = re.compile(f".*SC4{id:02}[12][EFG]0\.npz")
+            pattern = re.compile(f".*SC4{id:02}[12][EFG]0.npz")
             if re.match(pattern, name):
                 inner_list.append(name)
         if inner_list:  # not empty
