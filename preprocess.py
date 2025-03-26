@@ -45,17 +45,18 @@ def preprocess(data: List[torch.Tensor],
             beg += param['big_group_size']
         return torch.cat(chunks, dim=1) if chunks else torch.tensor([])
 
-    def label_big_group(l: np.ndarray) -> torch.Tensor:
-        """将标签分成大组"""
+    def label_big_group(l: torch.Tensor, param: dict) -> torch.Tensor:
+        """将标签分成大组以防止数据泄露"""
         chunks = []
         beg = 0
         while (beg + param['big_group_size']) <= len(l):
             y = l[beg:beg + param['big_group_size']]
-            # 将NumPy数组转换为PyTorch张量，并指定数据类型为long
-            y = torch.from_numpy(y).long().unsqueeze(0)
+            y = y.unsqueeze(0)  # 等同于 np.newaxis
             chunks.append(y)
             beg += param['big_group_size']
-        return torch.cat(chunks, dim=0) if chunks else torch.tensor([], dtype=torch.long)
+        
+        # 如果chunks不为空，沿着dim=0拼接所有张量；否则返回形状为(0, 1)的空张量
+        return torch.cat(chunks, dim=0) if chunks else torch.zeros((0, 1), dtype=torch.long)
 
     def data_window_slice(d: torch.Tensor) -> torch.Tensor:
         """数据增强的滑动窗口处理"""
@@ -78,22 +79,30 @@ def preprocess(data: List[torch.Tensor],
         
         return torch.cat(chunks, dim=0) if chunks else torch.tensor([])
 
-    def labels_window_slice(l: torch.Tensor) -> torch.Tensor:
-        """标签的滑动窗口处理"""
+    def labels_window_slice(l:torch.Tensor, param:dict, not_enhance:bool=False)->torch.Tensor:
+        """将标签数据按照滑动窗口进行增强处理"""
         stride = param['sequence_epochs'] if not_enhance else param['enhance_window_stride']
-        chunks = []
+        return_labels = None
         
-        for group in l:
-            group_chunks = []
-            cnt = 0
-            while (cnt + param['sequence_epochs']) <= len(group):
-                window = group[cnt:cnt + param['sequence_epochs']]
-                group_chunks.append(window.unsqueeze(0))
-                cnt += stride
-            if group_chunks:
-                chunks.append(torch.cat(group_chunks, dim=0))
+        for cnt1, group in enumerate(l):
+            # 添加维度检查
+            if group.dim() == 1:
+                group = group.unsqueeze(1)  # 转换为二维张量
+                
+            flat_labels = None
+            cnt2 = 0
+            
+            while (cnt2 + param['sequence_epochs']) <= group.shape[0]:
+                y = group[cnt2:cnt2 + param['sequence_epochs']]
+                y = y.unsqueeze(0)
+                
+                flat_labels = y if flat_labels is None else torch.cat([flat_labels, y], dim=0)
+                cnt2 += stride
+            
+            if flat_labels is not None:
+                return_labels = flat_labels if return_labels is None else torch.cat([return_labels, flat_labels], dim=0)
         
-        return torch.cat(chunks, dim=0) if chunks else torch.tensor([])
+        return return_labels if return_labels is not None else torch.zeros((0, param['sequence_epochs'], 1), dtype=torch.long)
 
     # 使用线程池处理数据
     with ThreadPoolExecutor(max_workers=8) as executor:

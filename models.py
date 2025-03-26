@@ -39,6 +39,7 @@ class Upsample(nn.Module):
 
     def forward(self, x):
         return self.upsample(x)
+
 class SingleSalientModel(nn.Module):
     def __init__(self, padding='same', **kwargs):
         super(SingleSalientModel, self).__init__()
@@ -55,6 +56,7 @@ class SingleSalientModel(nn.Module):
         self.mse_filters = kwargs['train']['mse_filters']
         self.hlfae = HLFAE(dim=1)  # 单通道处理
         self.init_model()
+
     def init_model(self):
         # Encoder
         self.encoder1 = UEncoder(1, self.filters[0], self.kernel_size, self.pooling_sizes[0], 
@@ -94,10 +96,39 @@ class SingleSalientModel(nn.Module):
                                      self.sequence_length * self.sleep_epoch_length // 2))
         self.reshape_conv = nn.Conv2d(self.filters[0], self.filters[0], kernel_size=1)
         self.final_conv = nn.Conv2d(self.filters[0], 5, kernel_size=(self.kernel_size, 1), padding='same')
+
+    def preprocess_input(self, x):
+        """
+        预处理输入数据使其符合模型要求的维度
+        输入 x: [channel=3, 大组数, 大组长度, 30s数据基本单元, h, n]
+        输出: [batch_size, channels=3, height, width=1]
+        """
+        # 调整维度顺序，将channel移到第二维
+        x = x.permute(1, 0, 2, 3, 4, 5)  # [大组数, channel=3, 大组长度, 30s数据, h, n]
+        
+        # 计算batch_size和height
+        batch_size = x.shape[0]  # 大组数作为batch_size
+        channels = x.shape[1]    # 保留通道数
+        height = x.shape[2] * x.shape[3]  # 大组长度 * 30s数据长度
+        
+        # 重新整形，保留通道维度
+        x = x.reshape(batch_size, channels, height, -1)  # 合并剩余维度到最后一维
+        x = x.squeeze(-1)  # 移除最后一维
+        x = x.unsqueeze(-1)  # 添加宽度维度为1
+        
+        return x
+    
     def forward(self, x):
-        # 首先通过HLFAE进行特征增强
+        # 预处理输入数据
+        x = self.preprocess_input(x)
+        
+        # 检查输入维度
+        assert len(x.shape) == 4, f"Expected 4D input tensor, got shape {x.shape}"
+        assert x.shape[1] == 3, f"Expected 3 channels, got {x.shape[1]}"
+        assert x.shape[3] == 1, f"Expected width 1, got {x.shape[3]}"
+        
+        # 继续原有的前向传播流程
         x = self.hlfae(x)
-        # 原有的编码器-解码器流程
         # Encoder
         u1 = self.encoder1(x)
         u1 = self.mse1(u1)
@@ -137,6 +168,7 @@ class SingleSalientModel(nn.Module):
         pool = F.avg_pool2d(reshape, kernel_size=(1, self.sleep_epoch_length))
         out = self.final_conv(pool)
         return F.softmax(out, dim=1)
+
 class TwoStreamSalientModel(nn.Module):
     def __init__(self, padding='same', **kwargs):
         super(TwoStreamSalientModel, self).__init__()
@@ -208,8 +240,47 @@ class TwoStreamSalientModel(nn.Module):
             zero_pad
         )
 
+    def preprocess_input(self, x):
+        """
+        预处理双流输入数据
+        输入 x: [channel=3, 大组数, 大组长度, 30s数据基本单元, h, n]
+        输出: 两个形状为 [batch_size, channels=1, height, width=1] 的张量，分别对应 EEG 和 EOG
+        """
+        # x的形状: [channel=3, 大组数, 大组长度, 30s数据基本单元, h, n]
+        
+        def process_single_stream(data, channel_idx):
+            # 选择指定通道的数据
+            data = data[channel_idx]  # 选择 EEG (idx=0) 或 EOG (idx=1)
+            
+            # 调整维度顺序
+            data = data.permute(0, 1, 2, 3, 4)  # [大组数, 大组长度, 30s数据, h, n]
+            
+            batch_size = data.shape[0]
+            height = data.shape[1] * data.shape[2]  # 大组长度 * 30s数据长度
+            
+            # 重新整形
+            data = data.reshape(batch_size, 1, height, -1)  # 添加channel维度
+            data = data.squeeze(-1)  # 移除最后一维
+            data = data.unsqueeze(-1)  # 添加宽度维度为1
+            return data
+        
+        # 分别处理 EEG 和 EOG 通道
+        eeg_processed = process_single_stream(x, channel_idx=0)  # EEG 通道
+        eog_processed = process_single_stream(x, channel_idx=1)  # EOG 通道
+        
+        return eeg_processed, eog_processed
+
     def forward(self, x):
-        eeg_input, eog_input = x
+        # 预处理输入数据
+        eeg_input, eog_input = self.preprocess_input(x)
+        
+        # 检查输入维度
+        for input_tensor in [eeg_input, eog_input]:
+            assert len(input_tensor.shape) == 4, f"Expected 4D input tensor, got shape {input_tensor.shape}"
+            assert input_tensor.shape[1] == 1, f"Expected 1 channel, got {input_tensor.shape[1]}"
+            assert input_tensor.shape[3] == 1, f"Expected width 1, got {input_tensor.shape[3]}"
+        
+        # 继续原有的前向传播流程
         eeg_output = self.eeg_branch(eeg_input)
         eog_output = self.eog_branch(eog_input)
 
@@ -230,6 +301,7 @@ class TwoStreamSalientModel(nn.Module):
         pool = F.avg_pool2d(reshape, kernel_size=(1, self.sleep_epoch_length))
         out = self.final_conv(pool)
         return F.softmax(out, dim=1)
+
 if __name__ == "__main__":
     import yaml
 
