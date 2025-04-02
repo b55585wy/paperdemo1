@@ -5,3 +5,7 @@
 *.pkl
 *.pth
 *.h5
+output/
+*.jpg
+*.png
+*.mp4
