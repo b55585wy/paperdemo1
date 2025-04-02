@@ -140,6 +140,9 @@ def train(args: argparse.Namespace, hyper_param_dict: dict) -> dict:
     if modal == 0:
         model = SingleSalientModel(**hyper_param_dict).to(device)
     else:
+
+        hyper_param_dict = hyper_params  # 假设这里是传递参数的地方
+        print(hyper_param_dict)  # 添加调试信息
         model = TwoStreamSalientModel(**hyper_param_dict).to(device)
 
     if gpu_num > 1:
@@ -219,7 +222,7 @@ def train(args: argparse.Namespace, hyper_param_dict: dict) -> dict:
             train_loss = 0
             train_correct = 0
             train_total = 0
-
+    
             for batch in train_loader:
                 if modal == 0:
                     inputs, labels = batch
@@ -227,23 +230,34 @@ def train(args: argparse.Namespace, hyper_param_dict: dict) -> dict:
                 else:
                     eeg, eog, labels = batch
                     outputs = model((eeg, eog))
-
+    
                 loss = weighted_loss(outputs, labels)
-
+    
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-
+    
                 train_loss += loss.item()
-                _, predicted = outputs.max(1)
-                train_total += labels.size(0)
-                train_correct += predicted.eq(labels).sum().item()
-
+                
+                # Correct reshaping for accuracy calculation - handle all dimensions
+                if len(outputs.shape) > 3:  # If shape is [batch, seq, classes, 1, 1]
+                    batch_size, seq_len, num_classes = outputs.shape[0], outputs.shape[1], outputs.shape[2]
+                    outputs_reshaped = outputs.view(batch_size * seq_len, num_classes)
+                    labels_reshaped = labels.view(-1)  # Flatten all dimensions
+                else:
+                    batch_size, seq_len, num_classes = outputs.shape[0], outputs.shape[1], outputs.shape[2]
+                    outputs_reshaped = outputs.view(batch_size * seq_len, num_classes)
+                    labels_reshaped = labels.view(batch_size * seq_len)
+                
+                _, predicted = outputs_reshaped.max(1)
+                train_total += labels_reshaped.size(0)
+                train_correct += predicted.eq(labels_reshaped).sum().item()
+    
             model.eval()
             val_loss = 0
             val_correct = 0
             val_total = 0
-
+    
             with torch.no_grad():
                 for batch in val_loader:
                     if modal == 0:
@@ -252,22 +266,34 @@ def train(args: argparse.Namespace, hyper_param_dict: dict) -> dict:
                     else:
                         eeg, eog, labels = batch
                         outputs = model((eeg, eog))
-
+    
                     loss = weighted_loss(outputs, labels)
                     val_loss += loss.item()
-                    _, predicted = outputs.max(1)
-                    val_total += labels.size(0)
-                    val_correct += predicted.eq(labels).sum().item()
-
+                    
+                    # Correct reshaping for accuracy calculation - handle all dimensions
+                    if len(outputs.shape) > 3:  # If shape is [batch, seq, classes, 1, 1]
+                        batch_size, seq_len, num_classes = outputs.shape[0], outputs.shape[1], outputs.shape[2]
+                        outputs_reshaped = outputs.view(batch_size * seq_len, num_classes)
+                        labels_reshaped = labels.view(-1)  # Flatten all dimensions
+                    else:
+                        batch_size, seq_len, num_classes = outputs.shape[0], outputs.shape[1], outputs.shape[2]
+                        outputs_reshaped = outputs.view(batch_size * seq_len, num_classes)
+                        labels_reshaped = labels.view(batch_size * seq_len)
+                    
+                    _, predicted = outputs_reshaped.max(1)
+                    val_total += labels_reshaped.size(0)
+                    val_correct += predicted.eq(labels_reshaped).sum().item()
+    
             train_acc = 100. * train_correct / train_total
             val_acc = 100. * val_correct / val_total
-
-            scheduler.step
-# Save the best model based on validation accuracy
+    
+            scheduler.step(val_acc)  # Fixed missing parameter
+    
+            # Save the best model based on validation accuracy
             if val_acc > best_val_acc:
                 best_val_acc = val_acc
                 torch.save(model.state_dict(), os.path.join(res_path, f"fold_{fold + 1}_best_model.pth"))
-
+    
             # Log training and validation metrics
             print(f'Epoch: {epoch + 1}/{hyper_param_dict["train"]["epochs"]} | '
                   f'Train Loss: {train_loss / len(train_loader):.4f} | '
@@ -295,6 +321,33 @@ def train(args: argparse.Namespace, hyper_param_dict: dict) -> dict:
         'loss': loss_list,
         'val_loss': val_loss_list
     }
+
+
+def calculate_accuracy(outputs, targets):
+    """计算分类准确率"""
+    # 处理多维输出
+    if len(outputs.shape) > 3:  # 5D tensor [batch, seq, classes, 1, 1]
+        batch_size, seq_len, num_classes = outputs.shape[0], outputs.shape[1], outputs.shape[2]
+        outputs_reshaped = outputs.view(batch_size * seq_len, num_classes)
+        targets_reshaped = targets.view(-1)  # Flatten all dimensions
+        _, predicted = outputs_reshaped.max(1)
+        correct = predicted.eq(targets_reshaped).sum().item()
+        total = targets_reshaped.size(0)
+    elif len(outputs.shape) > 2:  # 3D tensor [batch, seq, classes]
+        batch_size, seq_len = outputs.shape[0], outputs.shape[1]
+        outputs_reshaped = outputs.view(batch_size * seq_len, -1)
+        targets_reshaped = targets.view(batch_size * seq_len)
+        _, predicted = outputs_reshaped.max(1)
+        correct = predicted.eq(targets_reshaped).sum().item()
+        total = targets_reshaped.size(0)
+    else:
+        # 获取预测的类别（最大概率的索引）
+        _, predicted = torch.max(outputs.data, 1)  # 在类别维度上取最大值
+        correct = (predicted == targets).sum().item()
+        total = targets.size(0)
+    
+    # 返回准确率
+    return correct / total * 100.0
 
 
 if __name__ == "__main__":

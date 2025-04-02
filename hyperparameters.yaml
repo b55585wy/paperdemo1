@@ -9,11 +9,10 @@ train:
   batch_size: 8
   learning_rate: 0.001  # 添加这一行
   u_depths: [4, 4, 4, 4]
-  u_inner_filter: 8
-  activation: "relu"
+  u_inner_filter: 256  # 原值为8，调整为与最终通道数匹配
   filters: [16, 32, 64, 128, 256]
-  mse_filters: [32, 24, 16, 8, 5]
-  pooling_sizes: [10, 8, 6, 4]
+  mse_filters: [16, 32, 64, 128, 256] 
+  pooling_sizes: [5, 4, 3, 2] 
   dilation_sizes: [1, 2, 3, 4]
 
 evaluation:
