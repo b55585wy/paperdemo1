@@ -45,7 +45,7 @@ def preprocess(data: List[torch.Tensor],
             beg += param['big_group_size']
         return torch.cat(chunks, dim=1) if chunks else torch.tensor([])
 
-    def label_big_group(l: torch.Tensor, param: dict) -> torch.Tensor:
+    def label_big_group(l: torch.Tensor) -> torch.Tensor:
         """将标签分成大组以防止数据泄露"""
         chunks = []
         beg = 0
@@ -79,7 +79,7 @@ def preprocess(data: List[torch.Tensor],
         
         return torch.cat(chunks, dim=0) if chunks else torch.tensor([])
 
-    def labels_window_slice(l:torch.Tensor, param:dict, not_enhance:bool=False)->torch.Tensor:
+    def labels_window_slice(l:torch.Tensor)->torch.Tensor:
         """将标签数据按照滑动窗口进行增强处理"""
         stride = param['sequence_epochs'] if not_enhance else param['enhance_window_stride']
         return_labels = None
@@ -122,7 +122,11 @@ def preprocess(data: List[torch.Tensor],
     final_data = torch.cat([d for d in enhanced_data if d.numel()], dim=1)
     final_labels = torch.cat([l for l in enhanced_labels if l.numel()], dim=0)
 
-    # 确保标签是long类型
+    # 确保数据维度顺序正确
+    # [C, big_groups, sequence_length, 30s_data, h, n]
+    assert final_data.ndim == 6, f"Expected 6D tensor, got shape {final_data.shape}"
+    assert final_data.shape[0] == 3, f"Expected 3 channels, got {final_data.shape[0]}"
+    
     return final_data, final_labels.long().unsqueeze(2).unsqueeze(3)
 
 if __name__ == "__main__":

@@ -1,0 +1,15 @@
+2025-03-28 22:42:15,830 - train.py[line:94] in train - INFO: Using 1 GPUs
+2025-03-28 22:42:16,680 - train.py[line:156] in train - INFO: Starting validation: 1/20
+2025-03-28 22:42:16,680 - train.py[line:163] in train - INFO: Loading data...
+2025-03-28 22:42:18,942 - train.py[line:166] in train - INFO: Data loaded
+2025-03-28 22:42:18,943 - train.py[line:169] in train - INFO: Preprocessing data...
+2025-03-28 22:42:21,842 - train.py[line:172] in train - INFO: Preprocessing done
+2025-03-28 22:42:21,955 - train.py[line:181] in train - INFO: Detailed shape information:
+2025-03-28 22:42:21,955 - train.py[line:182] in train - INFO: train_data[0] (EEG) shape: torch.Size([112, 20, 3000, 1, 1])
+2025-03-28 22:42:21,955 - train.py[line:183] in train - INFO: train_data[1] (EOG) shape: torch.Size([112, 20, 3000, 1, 1])
+2025-03-28 22:42:21,955 - train.py[line:184] in train - INFO: train_labels shape: torch.Size([112, 20, 1, 1, 1])
+2025-03-28 22:42:21,955 - train.py[line:191] in train - INFO: Sample counts:
+2025-03-28 22:42:21,955 - train.py[line:192] in train - INFO: EEG samples: 112
+2025-03-28 22:42:21,955 - train.py[line:193] in train - INFO: EOG samples: 112
+2025-03-28 22:42:21,955 - train.py[line:194] in train - INFO: Label samples: 112
+2025-03-28 22:42:22,183 - models.py[line:34] in forward - INFO: Input shape before MSE: torch.Size([8, 16, 6000, 1])

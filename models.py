@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 from hlfae import HLFAE
+import logging
 
 class UEncoder(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, pooling_size, middle_layer_filter, depth, activation):
@@ -29,6 +30,8 @@ class MSE(nn.Module):
         self.mse = nn.Sequential(*layers)
 
     def forward(self, x):
+        # 添加维度检查
+        logging.info(f"Input shape before MSE: {x.shape}")
         return self.mse(x)
 
 
@@ -119,18 +122,18 @@ class SingleSalientModel(nn.Module):
         return x
     
     def forward(self, x):
-        # 预处理输入数据
+        # 1. 预处理输入数据
         x = self.preprocess_input(x)
-        
-        # 检查输入维度
-        assert len(x.shape) == 4, f"Expected 4D input tensor, got shape {x.shape}"
-        assert x.shape[1] == 3, f"Expected 3 channels, got {x.shape[1]}"
-        assert x.shape[3] == 1, f"Expected width 1, got {x.shape[3]}"
-        
-        # 继续原有的前向传播流程
+        logging.info(f"After preprocess shape: {x.shape}")
+
+        # 2. HLFAE 处理
         x = self.hlfae(x)
-        # Encoder
-        u1 = self.encoder1(x)
+        logging.info(f"After HLFAE shape: {x.shape}")  # 这里会显示 HLFAE 的输出维度
+
+        # 3. UUNet 处理
+        # 3.1 编码器部分
+        u1 = self.encoder1(x)     # UEncoder
+        logging.info(f"After UEncoder1 shape: {u1.shape}")
         u1 = self.mse1(u1)
         pool1 = F.max_pool2d(u1, kernel_size=(self.pooling_sizes[0], 1))
 

@@ -1,0 +1,2 @@
+2025-03-28 23:01:54,066 - train.py[line:94] in train - INFO: Using 1 GPUs
+2025-03-28 23:01:54,066 - train.py[line:99] in train - CRITICAL: No npz files found in ../autodl-fs/prepared-cassette

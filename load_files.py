@@ -1,4 +1,6 @@
 import numpy as np
+from typing import List, Tuple
+import torch
 
 
 def load_npz_file(npz_file: str) -> tuple[np.ndarray, np.ndarray, int]:
@@ -18,7 +20,7 @@ def load_npz_file(npz_file: str) -> tuple[np.ndarray, np.ndarray, int]:
 
 
 
-def load_npz_files(npz_files: list[str]) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+def load_npz_files(npz_files: List[str]) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
     """
     Load data and labels for training and validation
 
@@ -42,9 +44,14 @@ def load_npz_files(npz_files: list[str]) -> tuple[list[torch.Tensor], list[torch
         tmp_data = torch.tensor(tmp_data, dtype=torch.float32)
         tmp_labels = torch.tensor(tmp_labels, dtype=torch.int32)
 
-        # Add one extra axis for adaptation to Conv2d layer
-        tmp_data = tmp_data[:, :, :, np.newaxis, np.newaxis]  # expanded the N and H axis, [None, W, C, H, N]
-        tmp_data = torch.cat((tmp_data[:, :, :, 0, :], tmp_data[:, :, :, 1, :], tmp_data[:, :, :, 2, :]), dim=0)  # transmute the shape to [C, None, W, H, N]
+        # 维度处理
+        tmp_data = torch.squeeze(tmp_data)  # [None, W, C]
+        tmp_data = tmp_data[:, :, :, None, None]  # [None, W, C, 1, 1]
+        
+        # 分离并连接通道
+        tmp_data = torch.cat([
+            tmp_data[:, :, i, :, :].unsqueeze(0) for i in range(3)
+        ], dim=0)  # [C, None, W, 1, 1]
 
         data_list.append(tmp_data)
         labels_list.append(tmp_labels)

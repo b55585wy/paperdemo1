@@ -6,19 +6,22 @@ import logging
 import argparse
 import itertools
 import numpy as np
-# import torch
-# import torch.nn as nn
+import torch
+import torch.nn as nn
 import yaml
+import sys
 
-# from torch.utils.data import DataLoader, TensorDataset
-# from torch.optim import Adam
-# from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.utils.data import DataLoader, TensorDataset
+from torch.optim import Adam
+from torch.utils.data import DataLoader, TensorDataset
+from torch.optim import Adam
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from preprocess import preprocess
 from load_files import load_npz_files
-# from evaluation import draw_training_plot
-# from models import SingleSalientModel, TwoStreamSalientModel
-# from loss_function import WeightedCrossEntropyLoss
+from evaluation import draw_training_plot
+from models import SingleSalientModel, TwoStreamSalientModel
+from loss_function import WeightedCrossEntropyLoss
 
 
 def gpu_settings():
@@ -175,6 +178,29 @@ def train(args: argparse.Namespace, hyper_param_dict: dict) -> dict:
         train_labels = torch.LongTensor(train_labels).to(device)
         val_labels = torch.LongTensor(val_labels).to(device)
 
+        # 在创建 TensorDataset 之前，记录维度信息到日志
+        logging.info("Detailed shape information:")
+        logging.info(f"train_data[0] (EEG) shape: {train_data[0].shape}")
+        logging.info(f"train_data[1] (EOG) shape: {train_data[1].shape}")
+        logging.info(f"train_labels shape: {train_labels.shape}")
+        
+        # 检查第一个维度（样本数）
+        eeg_samples = train_data[0].shape[0]
+        eog_samples = train_data[1].shape[0]
+        label_samples = train_labels.shape[0]
+        
+        logging.info("Sample counts:")
+        logging.info(f"EEG samples: {eeg_samples}")
+        logging.info(f"EOG samples: {eog_samples}")
+        logging.info(f"Label samples: {label_samples}")
+        
+        if not (eeg_samples == eog_samples == label_samples):
+            logging.error("Sample dimension mismatch detected!")
+            logging.error(f"EEG vs EOG diff: {abs(eeg_samples - eog_samples)}")
+            logging.error(f"EEG vs Labels diff: {abs(eeg_samples - label_samples)}")
+            logging.error(f"EOG vs Labels diff: {abs(eog_samples - label_samples)}")
+            raise ValueError("Sample dimensions don't match")
+        
         # Create datasets and dataloaders
         if modal == 0:
             train_dataset = TensorDataset(train_data[0], train_labels)
@@ -272,6 +298,7 @@ def train(args: argparse.Namespace, hyper_param_dict: dict) -> dict:
 
 
 if __name__ == "__main__":
+    print("Starting program...")
     # Set up GPU settings
     gpu_settings()
 
