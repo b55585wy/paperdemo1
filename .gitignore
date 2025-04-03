@@ -33,4 +33,5 @@ Thumbs.db
 output/
 *.jpg
 *.png
-*.mp4
+*.mp4output/fold_1_best_model.pth
+weights.pth
