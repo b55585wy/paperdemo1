@@ -440,28 +440,22 @@ class TwoStreamSalientModel(nn.Module):
         reshape = self.reshape_conv(reweighted)
         
         # 添加全局平均池化，将时间维度压缩
-        # 这会将形状从 [batch, channels, time, 1] 变为 [batch, channels, 1, 1]
         global_pool = F.adaptive_avg_pool2d(reshape, (1, 1))
         
         # 最终卷积层
         out = self.final_conv(global_pool)
         
-        # 重塑输出以匹配目标标签的形状 [batch, 20, 1, 1, 1]
-        # 首先将输出从 [batch, 5, 1, 1] 重塑为 [batch, 5]
-        out = out.squeeze(-1).squeeze(-1)
+        # 重塑输出以匹配目标标签的形状
+        out = out.squeeze(-1).squeeze(-1)  # 移除最后两个维度
         
-        # 然后扩展为 [batch, 5, 1, 1, 1]
-        out = out.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+        # 确保输出维度与标签匹配
+        batch_size = out.shape[0]
+        seq_len = 20  # 从配置中的 sequence_epochs
         
-        # 最后，我们需要将类别预测复制 20 次以匹配目标的序列长度
-        # 从 [batch, 5, 1, 1, 1] 到 [batch, 5, 20, 1, 1]
-        out = out.repeat(1, 1, 20, 1, 1)
+        # 重塑为 [batch, seq, classes]
+        out = out.unsqueeze(1).repeat(1, seq_len, 1)
         
-        # 转置维度，使类别维度在最后
-        # 从 [batch, 5, 20, 1, 1] 到 [batch, 20, 5, 1, 1]
-        out = out.permute(0, 2, 1, 3, 4)
-        
-        return F.softmax(out, dim=2)  # 在类别维度上应用 softmax
+        return out
 
 if __name__ == "__main__":
     import yaml

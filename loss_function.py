@@ -13,21 +13,27 @@ class WeightedCrossEntropyLoss(nn.Module):
             self.register_buffer('weight', torch.tensor(weight))
         else:
             self.weight = None
+    # 确保损失函数正确处理维度不匹配
+    # 在损失函数中添加维度调整
     def forward(self, pred, target):
-        # 记录形状以便调试
+        # 记录原始形状
         logging.info(f"Loss function - pred shape: {pred.shape}, target shape: {target.shape}")
         
-        # 重塑预测值从 [batch, seq, classes, 1, 1] 到 [batch*seq, classes]
-        batch_size, seq_len, n_classes = pred.size(0), pred.size(1), pred.size(2)
-        pred = pred.view(batch_size * seq_len, n_classes, -1).squeeze(-1)
+        # 调整维度
+        batch_size, seq_len = pred.shape[0], pred.shape[1]
+        num_classes = pred.shape[2]
         
-        # 重塑目标从 [batch, seq, 1, 1, 1] 到 [batch*seq]
-        target = target.view(batch_size * seq_len)
+        # 将预测从 [batch, seq, classes, 1, 1] 重塑为 [batch*seq, classes]
+        # 使用 reshape 而不是 view，因为 view 要求内存连续
+        pred = pred.reshape(batch_size * seq_len, num_classes)
         
-        # 确保目标是长整型
-        target = target.long()
+        # 将目标从 [batch, seq, 1, 1, 1] 重塑为 [batch*seq]
+        target = target.reshape(-1)  # 使用 reshape 而不是 view
         
-        # 权重会自动与预测值在同一设备上
+        # 记录调整后的形状
+        logging.info(f"Reshaped - pred: {pred.shape}, target: {target.shape}")
+        
+        # 计算损失
         return F.cross_entropy(pred, target, weight=self.weight)
 
 def calculate_f1_score(pred, target, average='macro'):

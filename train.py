@@ -150,7 +150,13 @@ def train(args: argparse.Namespace, hyper_param_dict: dict) -> dict:
 
     # Optimizer and scheduler
     optimizer = Adam(model.parameters(), lr=hyper_param_dict['train']['learning_rate'])
-    scheduler = ReduceLROnPlateau(optimizer, mode='max', patience=5, factor=0.1)
+    # 添加学习率调度器
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 
+    mode='min', 
+    factor=0.1, 
+    patience=5,
+    verbose=True
+    )
 
     # Save initial weights
     torch.save(model.state_dict(), 'weights.pth')
@@ -231,27 +237,39 @@ def train(args: argparse.Namespace, hyper_param_dict: dict) -> dict:
                     eeg, eog, labels = batch
                     outputs = model((eeg, eog))
     
+                # 在训练循环中添加
+                for name, param in model.named_parameters():
+                    if param.grad is not None:
+                        print(f"{name} grad norm: {param.grad.norm()}")
                 loss = weighted_loss(outputs, labels)
     
+                # 添加调试信息
+                print(f"Loss value: {loss.item()}")
+                
                 optimizer.zero_grad()
                 loss.backward()
+                
+                # 检查梯度
+                total_grad_norm = 0
+                for name, param in model.named_parameters():
+                    if param.grad is not None:
+                        grad_norm = param.grad.norm()
+                        total_grad_norm += grad_norm
+                        if grad_norm > 0:
+                            print(f"{name} grad norm: {grad_norm}")
+                
+                print(f"Total gradient norm: {total_grad_norm}")
+                
                 optimizer.step()
     
                 train_loss += loss.item()
                 
-                # Correct reshaping for accuracy calculation - handle all dimensions
-                if len(outputs.shape) > 3:  # If shape is [batch, seq, classes, 1, 1]
-                    batch_size, seq_len, num_classes = outputs.shape[0], outputs.shape[1], outputs.shape[2]
-                    outputs_reshaped = outputs.view(batch_size * seq_len, num_classes)
-                    labels_reshaped = labels.view(-1)  # Flatten all dimensions
-                else:
-                    batch_size, seq_len, num_classes = outputs.shape[0], outputs.shape[1], outputs.shape[2]
-                    outputs_reshaped = outputs.view(batch_size * seq_len, num_classes)
-                    labels_reshaped = labels.view(batch_size * seq_len)
-                
-                _, predicted = outputs_reshaped.max(1)
-                train_total += labels_reshaped.size(0)
-                train_correct += predicted.eq(labels_reshaped).sum().item()
+                # 修改这里的准确率计算方式
+                _, predicted = outputs.max(2)  # 在类别维度上取最大值
+                predicted = predicted.reshape(-1)  # 使用 reshape 而不是 view
+                labels_flat = labels.reshape(-1)  # 使用 reshape 而不是 view
+                train_total += labels_flat.size(0)
+                train_correct += (predicted == labels_flat).sum().item()
     
             model.eval()
             val_loss = 0
@@ -270,19 +288,27 @@ def train(args: argparse.Namespace, hyper_param_dict: dict) -> dict:
                     loss = weighted_loss(outputs, labels)
                     val_loss += loss.item()
                     
+                    # 修改这里的准确率计算方式
+                    _, predicted = outputs.max(2)  # 在类别维度上取最大值
+                    predicted = predicted.view(-1)  # 展平预测结果
+                    labels_flat = labels.view(-1)  # 展平标签
+                    val_total += labels_flat.size(0)
+                    val_correct += (predicted == labels_flat).sum().item()
+    
                     # Correct reshaping for accuracy calculation - handle all dimensions
-                    if len(outputs.shape) > 3:  # If shape is [batch, seq, classes, 1, 1]
-                        batch_size, seq_len, num_classes = outputs.shape[0], outputs.shape[1], outputs.shape[2]
-                        outputs_reshaped = outputs.view(batch_size * seq_len, num_classes)
-                        labels_reshaped = labels.view(-1)  # Flatten all dimensions
-                    else:
-                        batch_size, seq_len, num_classes = outputs.shape[0], outputs.shape[1], outputs.shape[2]
-                        outputs_reshaped = outputs.view(batch_size * seq_len, num_classes)
-                        labels_reshaped = labels.view(batch_size * seq_len)
+                    # 删除这个重复的准确率计算块，或者保留这个而删除上面的
+                    # if len(outputs.shape) > 3:  # If shape is [batch, seq, classes, 1, 1]
+                    #     batch_size, seq_len, num_classes = outputs.shape[0], outputs.shape[1], outputs.shape[2]
+                    #     outputs_reshaped = outputs.view(batch_size * seq_len, num_classes)
+                    #     labels_reshaped = labels.view(-1)  # Flatten all dimensions
+                    # else:
+                    #     batch_size, seq_len, num_classes = outputs.shape[0], outputs.shape[1], outputs.shape[2]
+                    #     outputs_reshaped = outputs.view(batch_size * seq_len, num_classes)
+                    #     labels_reshaped = labels.view(batch_size * seq_len)
                     
-                    _, predicted = outputs_reshaped.max(1)
-                    val_total += labels_reshaped.size(0)
-                    val_correct += predicted.eq(labels_reshaped).sum().item()
+                    # _, predicted = outputs_reshaped.max(1)
+                    # val_total += labels_reshaped.size(0)
+                    # val_correct += predicted.eq(labels_reshaped).sum().item()
     
             train_acc = 100. * train_correct / train_total
             val_acc = 100. * val_correct / val_total
