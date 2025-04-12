@@ -1,24 +1,43 @@
+# 超参数配置文件
+
+# 睡眠数据相关参数
+sleep_epoch_len: 30 # 睡眠片段长度（秒）
+num_classes: 5 # 睡眠阶段分类数量
+
+# 类别权重（处理类别不平衡问题）
+class_weights: [1.0, 1.5, 2.0, 1.5, 1.0] # 对应W, N1, N2, N3, REM
+
+# 预处理参数
 preprocess:
-  sequence_epochs:      20
-  big_group_size:       40
-  enhance_window_stride: 10
+  big_group_size: 200 # 大组大小，防止数据泄露
+  sequence_epochs: 30 # 序列长度（睡眠片段数量）
+  enhance_window_stride: 5 # 数据增强的滑动窗口步长
+  use_augmentation: true
+  noise_level: 0.05
+  time_warp_factor: 0.1
 
+# 训练参数
 train:
-  kernel_size: 3
-  epochs: 60
-  batch_size: 8
-  learning_rate: 0.001  # 添加这一行
-  u_depths: [4, 4, 4, 4]
-  u_inner_filter: 256  # 原值为8，调整为与最终通道数匹配
-  filters: [16, 32, 64, 128, 256]
-  mse_filters: [16, 32, 64, 128, 256] 
-  pooling_sizes: [5, 4, 3, 2] 
-  dilation_sizes: [1, 2, 3, 4]
+  batch_size: 4
+  learning_rate: 0.0005
+  epochs: 50
+  gradient_accumulation: 4
 
-evaluation:
-  label_class: ["W", "N1", "N2", "N3", "REM"]
+# 模型参数
+model:
+  type: "transformer"  # 使用能处理变长序列的模型
+  hidden_dim: 64
+  num_layers: 2
+  num_heads: 8
+  encoder_dim: 32 # 编码器维度
+  num_attention_heads: 8
+  feed_forward_expansion_factor: 2
+  conv_expansion_factor: 2
+  feed_forward_dropout_p: 0.1
+  attention_dropout_p: 0.1
+  conv_dropout_p: 0.1
+  conv_kernel_size: 3
+  half_step_residual: true
 
-class_weights: [1.0, 1.80, 1.0, 1.25, 1.20]
-patience: 5
-optimizer: "adam"
-sleep_epoch_len: 3000
+# 学习率调度器参数
+patience: 5 # 学习率降低前等待的轮次数
