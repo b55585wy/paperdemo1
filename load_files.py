@@ -3,9 +3,11 @@ import itertools
 import re
 
 import numpy as np
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 import torch
 import os
+import torch.nn as nn
+from models import ConbimambaBlock
 
 
 def load_npz_file(npz_file: str) -> tuple[np.ndarray, np.ndarray, int]:
@@ -41,7 +43,9 @@ def load_npz_files(npz_files: List[str]) -> Tuple[List[torch.Tensor], List[torch
             fs = sampling_rate
         elif fs != sampling_rate:
             raise Exception("Found mismatch in sampling rate.")
-
+ # d的维度是[睡眠不定长（根据每个人每晚睡眠的时长来确定）片段数N, 片段固定时长, 通道]
+        # l的维度是[睡眠不定长片段数N, 1]
+        # 数据增强实际上是相当于重复采样扩大睡眠不定长片段N
         # 转换为torch张量
         tmp_data = torch.tensor(tmp_data, dtype=torch.float32)  # Tensor维度是 (None,W(能看做宽度吗？这个时间步长),C)
         tmp_labels = torch.tensor(tmp_labels, dtype=torch.int32)  # Tensor (None,1)
@@ -106,3 +110,60 @@ if __name__ == '__main__':
     # val_eeg, val_eog, val_labels = load_npz_files(path)
     train_eeg, train_labels = load_npz_files(path)
     val_eeg, val_labels = load_npz_files(path)
+
+
+
+def preprocess(data: List[torch.Tensor], 
+               labels: List[torch.Tensor], 
+               param: Dict, 
+               not_enhance: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    数据预处理
+    
+    Args:
+        data: PSG数据列表
+        labels: 标签列表
+        param: 预处理参数
+        not_enhance: 是否不使用数据增强
+        
+    Returns:
+        处理后的数据和标签
+    """
+    # 标准化
+    normalized_data = [normalization(d) for d in data]
+    
+    # 创建样本（每个样本是sequence_epochs个连续的30秒片段）
+    samples = []
+    sample_labels = []
+    
+    for i, (d, l) in enumerate(zip(normalized_data, labels)):
+        # 确保标签维度正确
+        l = l.squeeze(-1) if l.dim() > 1 else l  # 确保标签是[N]而不是[N,1]
+        
+        # 正确的维度访问方式
+        time_steps = d.shape[0]  # 片段数N
+        
+        # 对每个病人/每晚的数据单独进行滑动窗口处理
+        sequence_epochs = param['sequence_epochs']  # 获取序列长度参数
+        stride = param['enhance_window_stride'] if not not_enhance else sequence_epochs
+        
+        # 滑动窗口创建样本
+        cnt = 0
+        samples_per_file = 0
+        
+        while (cnt + sequence_epochs) <= time_steps:
+            # 提取样本和对应标签
+            sample_data = d[cnt:cnt+sequence_epochs]  # [sequence_epochs, W, C]
+            sample_label = l[cnt+sequence_epochs-1]  # 取最后一个时间步的标签作为序列标签
+            
+            # 添加到样本列表
+            samples.append(sample_data)
+            sample_labels.append(sample_label)
+            samples_per_file += 1
+            cnt += stride
+            
+        print(f"文件 {i}: 生成了 {samples_per_file} 个样本")
+    
+    # 将样本转换为张量批次
+    # 使用自定义collate函数处理可变长度序列
+    return samples, sample_labels

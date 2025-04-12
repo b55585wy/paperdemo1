@@ -35,3 +35,11 @@ output/
 *.png
 *.mp4output/fold_1_best_model.pth
 weights.pth
+
+*.whl
+*.whl.part
+*.whl.part.tmp
+*.whl.tmp
+*.whl.tmp.part
+*.whl.tmp.part.tmp
+*.whl.tmp.part.tmp.tmp

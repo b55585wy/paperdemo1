@@ -38,51 +38,32 @@ def preprocess(data: List[torch.Tensor],
         处理后的数据和标签
     """
     # 标准化
-    normalized_data = [normalization(torch.tensor(d)) for d in data]
+    normalized_data = [normalization(d) for d in data]
     
     # 创建样本（每个样本是sequence_epochs个连续的30秒片段）
     samples = []
     sample_labels = []
     
-     
-    
     for i, (d, l) in enumerate(zip(normalized_data, labels)):
-        # 打印原始数据和标签的形状
-        print(f"文件 {i}: 数据形状 {d.shape}, 标签形状 {l.shape}")
-        
-        # 正确的维度访问方式
-        time_steps = d.shape[0]  # 片段数N
-        
-        # 对每个病人/每晚的数据单独进行滑动窗口处理
-        sequence_epochs = param['sequence_epochs']  # 获取序列长度参数
+        l = l.squeeze(-1)  # 确保标签是[N]维度
+        time_steps = d.shape[0]
+        sequence_epochs = param['sequence_epochs']
         stride = param['enhance_window_stride'] if not not_enhance else sequence_epochs
         
-        # 滑动窗口创建样本
         cnt = 0
-        samples_per_file = 0
-        # d的维度是[睡眠不定长（根据每个人每晚睡眠的时长来确定）片段数N, 片段固定时长, 通道]
-        # l的维度是[睡眠不定长片段数N, 1]
-        # 数据增强实际上是相当于重复采样扩大睡眠不定长片段N
         while (cnt + sequence_epochs) <= time_steps:
-            # 提取样本和对应标签
-            sample_data = d[cnt:cnt+sequence_epochs, :, :]  # 在第一维(N)上截取
-            sample_label = l[cnt:cnt+sequence_epochs]
-            
-       
-        
-             
+            sample_data = d[cnt:cnt+sequence_epochs]
+            sample_label = l[cnt + sequence_epochs - 1].item()  # 关键修改
             
             samples.append(sample_data)
             sample_labels.append(sample_label)
-            samples_per_file += 1
             cnt += stride
-        
     
-    
-    
-    
-    
-    # 返回样本列表和标签列表
+    # 验证标签格式
+    assert all(isinstance(lbl, int) for lbl in sample_labels), "标签必须为整数"
+    print(f"示例标签类型: {type(sample_labels[0])}, 值: {sample_labels[0]}")
+    unique_labels = set(sample_labels)
+    print(f"唯一标签值: {unique_labels}")
     return samples, sample_labels
 
 if __name__ == "__main__":

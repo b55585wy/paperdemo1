@@ -1,43 +1,20 @@
-# 超参数配置文件
+data:
+  data_dir: "./data/"
 
-# 睡眠数据相关参数
-sleep_epoch_len: 30 # 睡眠片段长度（秒）
-num_classes: 5 # 睡眠阶段分类数量
-
-# 类别权重（处理类别不平衡问题）
-class_weights: [1.0, 1.5, 2.0, 1.5, 1.0] # 对应W, N1, N2, N3, REM
-
-# 预处理参数
 preprocess:
-  big_group_size: 200 # 大组大小，防止数据泄露
-  sequence_epochs: 30 # 序列长度（睡眠片段数量）
-  enhance_window_stride: 5 # 数据增强的滑动窗口步长
-  use_augmentation: true
-  noise_level: 0.05
-  time_warp_factor: 0.1
+  sequence_epochs: 20  # 每个样本包含20个连续的30秒片段
+  enhance_window_stride: 5  # 数据增强时的滑动窗口步长
+  normalize: true
 
-# 训练参数
-train:
-  batch_size: 4
-  learning_rate: 0.0005
-  epochs: 50
-  gradient_accumulation: 4
-
-# 模型参数
 model:
-  type: "transformer"  # 使用能处理变长序列的模型
-  hidden_dim: 64
-  num_layers: 2
-  num_heads: 8
-  encoder_dim: 32 # 编码器维度
-  num_attention_heads: 8
-  feed_forward_expansion_factor: 2
-  conv_expansion_factor: 2
-  feed_forward_dropout_p: 0.1
-  attention_dropout_p: 0.1
-  conv_dropout_p: 0.1
-  conv_kernel_size: 3
-  half_step_residual: true
+  time_steps: 3000  # 固定时间步长
+  hidden_dim: 64  # 隐藏层维度
+  num_classes: 5  # 五分类
+  num_blocks: 2  # Conbimamba块的数量
 
-# 学习率调度器参数
-patience: 5 # 学习率降低前等待的轮次数
+training:
+  batch_size: 8
+  epochs: 50
+  lr: 0.001
+  patience: 10  # 早停参数
+  k_folds: 10  # K折交叉验证数量
