@@ -13,9 +13,9 @@ from typing import List, Dict, Tuple
 
 from load_files import load_npz_files
 from preprocess import preprocess
-from models import ConbimambaBlock
+from models import MambaSS1D, PositionalEncoding
 
-# 定义上面创建的分类器
+# 定义睡眠分期分类器
 
 class SleepStageClassifier(nn.Module):
     def __init__(self, time_steps=3000, hidden_dim=64, num_classes=5, num_blocks=2):
@@ -28,16 +28,21 @@ class SleepStageClassifier(nn.Module):
             nn.MaxPool1d(kernel_size=2)
         )
         
-        # 序列处理模块
+        # 位置编码增强时序信息
+        self.pos_encoder = PositionalEncoding(d_model=hidden_dim, max_len=time_steps//2)
+        
+        # MambaSS1D 序列处理模块
         self.sequence_blocks = nn.ModuleList([
-            ConbimambaBlock(
-                encoder_dim=hidden_dim,
-                conv_kernel_size=15,
-                feed_forward_expansion_factor=2
+            MambaSS1D(
+                d_model=hidden_dim,
+                d_state=16,
+                d_conv=3,
+                expand=2.0,
+                dropout=0.1
             ) for _ in range(num_blocks)
         ])
         
-        # 分类头 - 修改这部分
+        # 分类头
         self.global_pool = nn.AdaptiveAvgPool1d(1)
         self.classifier = nn.Linear(hidden_dim, num_classes)
 
@@ -53,7 +58,16 @@ class SleepStageClassifier(nn.Module):
         x = x.permute(0, 2, 1)  # [B*N, 1, W]
         x = self.time_feature_extractor(x)  # [B*N, hidden_dim, W/2]
         
-        # 关键修改：直接进行全局池化
+        # 转换为序列处理格式并添加位置编码
+        x = x.permute(0, 2, 1)  # [B*N, W/2, hidden_dim]
+        x = self.pos_encoder(x)  # 添加位置编码
+        
+        # 通过MambaSS1D块处理序列
+        for block in self.sequence_blocks:
+            x = block(x)  # [B*N, W/2, hidden_dim]
+        
+        # 全局池化获取序列特征
+        x = x.permute(0, 2, 1)  # [B*N, hidden_dim, W/2]
         x = self.global_pool(x)  # [B*N, hidden_dim, 1]
         x = x.squeeze(-1)  # [B*N, hidden_dim]
         

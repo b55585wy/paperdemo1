@@ -7,7 +7,6 @@ from typing import List, Tuple, Dict
 import torch
 import os
 import torch.nn as nn
-from models import ConbimambaBlock
 
 
 def load_npz_file(npz_file: str) -> tuple[np.ndarray, np.ndarray, int]:
